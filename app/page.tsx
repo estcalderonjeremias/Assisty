@@ -11,10 +11,7 @@ import {
 } from '@/lib/supabaseClient';
 import {
   Fingerprint,
-  LayoutDashboard,
   Monitor,
-  Database,
-  WifiOff,
   Lock,
   X,
   Settings,
@@ -80,50 +77,26 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Switcher de Vistas & Badge Supabase */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          {/* Badge Estado Supabase */}
+        {/* Botón único para alternar entre Kiosco y Admin */}
+        <div className="flex items-center">
           <button
             type="button"
-            onClick={() => setShowSupabaseModal(true)}
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer transition-all hover:brightness-110 ${
-              isSupabaseConfigured
-                ? 'bg-status-success/15 text-status-success border-status-success/30'
-                : 'bg-status-error/15 text-status-error border-status-error/30'
-            }`}
+            onClick={currentView === 'kiosk' ? handleSelectAdmin : handleBackToKiosk}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-surface/80 hover:bg-surface border border-white/10 hover:border-neon-green/40 text-text-main hover:text-white transition-all shadow-md active:scale-95 group"
+            title={currentView === 'kiosk' ? 'Cambiar a Panel Admin' : 'Volver a Terminal Kiosco'}
           >
-            {isSupabaseConfigured ? <Database size={13} /> : <WifiOff size={13} />}
-            <span>{isSupabaseConfigured ? 'Supabase Conectado' : 'Sin Conexión a Supabase'}</span>
+            {currentView === 'kiosk' ? (
+              <>
+                <Lock size={14} className="text-neon-green group-hover:scale-110 transition-transform" />
+                <span>Admin</span>
+              </>
+            ) : (
+              <>
+                <Monitor size={14} className="text-neon-green group-hover:scale-110 transition-transform" />
+                <span>Kiosco</span>
+              </>
+            )}
           </button>
-
-          {/* Toggle Kiosco / Admin */}
-          <div className="flex bg-surface/80 p-1 rounded-xl border border-white/10">
-            <button
-              type="button"
-              onClick={handleBackToKiosk}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                currentView === 'kiosk'
-                  ? 'bg-neon-green text-black shadow-neon'
-                  : 'text-text-muted hover:text-white'
-              }`}
-            >
-              <Monitor size={14} />
-              Kiosco
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSelectAdmin}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                currentView === 'admin'
-                  ? 'bg-neon-green text-black shadow-neon'
-                  : 'text-text-muted hover:text-white'
-              }`}
-            >
-              {isAdminAuthenticated ? <LayoutDashboard size={14} /> : <Lock size={14} />}
-              Admin
-            </button>
-          </div>
         </div>
       </header>
 
