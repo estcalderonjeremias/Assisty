@@ -27,9 +27,11 @@ import {
   Loader2,
   Camera,
   ScanFace,
-  BarChart3
+  BarChart3,
+  Database
 } from 'lucide-react';
 import { AdminStatsView } from './AdminStatsView';
+import { SupabaseConfigModal } from './SupabaseConfigModal';
 
 interface AdminDashboardViewProps {
   onBackToKiosk: () => void;
@@ -58,6 +60,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBackTo
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('TODOS');
   const [selectedException, setSelectedException] = useState<Asistencia | null>(null);
+  const [showSupabaseModal, setShowSupabaseModal] = useState<boolean>(false);
 
   // Modals for CRUD
   const [showEmpModal, setShowEmpModal] = useState<boolean>(false);
@@ -452,7 +455,15 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBackTo
         </div>
 
         {/* Footer Sidebar */}
-        <div className="pt-6 border-t border-white/10">
+        <div className="pt-6 border-t border-white/10 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setShowSupabaseModal(true)}
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-text-muted hover:text-white text-xs font-semibold transition-colors"
+          >
+            <Database size={14} className="text-neon-green" />
+            Configurar Supabase
+          </button>
           <button
             type="button"
             onClick={onBackToKiosk}
@@ -468,22 +479,32 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBackTo
       <main className="flex-1 p-4 sm:p-8 overflow-y-auto max-w-7xl">
         {/* Banner de error de conexión a Supabase */}
         {dataError && (
-          <div className="mb-6 p-4 rounded-2xl bg-status-error/15 border border-status-error/30 text-white flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="text-status-error shrink-0" size={20} />
+          <div className="mb-6 p-4 rounded-2xl bg-status-error/15 border border-status-error/30 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3">
+              <AlertTriangle className="text-status-error shrink-0 mt-0.5 sm:mt-0" size={20} />
               <div>
                 <div className="text-sm font-bold text-status-error">Error al conectar con Supabase</div>
                 <div className="text-xs text-text-muted">{dataError}</div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={loadAllData}
-              className="px-3.5 py-1.5 rounded-xl bg-status-error/25 hover:bg-status-error/40 text-white text-xs font-semibold shrink-0 transition-colors flex items-center gap-1.5"
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-              Reintentar
-            </button>
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowSupabaseModal(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-neon-emerald/20 hover:bg-neon-emerald/30 border border-neon-green/30 text-neon-green text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <Database size={13} />
+                Solucionar / Configurar
+              </button>
+              <button
+                type="button"
+                onClick={loadAllData}
+                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+              >
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                Reintentar
+              </button>
+            </div>
           </div>
         )}
 
@@ -1183,6 +1204,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBackTo
           </div>
         </div>
       )}
+
+      {/* Modal de Configuración de Supabase */}
+      <SupabaseConfigModal
+        isOpen={showSupabaseModal}
+        onClose={() => setShowSupabaseModal(false)}
+        onSuccess={loadAllData}
+      />
     </div>
   );
 };

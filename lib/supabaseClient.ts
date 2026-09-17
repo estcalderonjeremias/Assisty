@@ -3,24 +3,36 @@ import { Turno, Empleado, Asistencia, EstadoFichaje } from '@/types/database';
 import { BiometricEngine } from '@/lib/biometrics';
 
 function resolveSupabaseConfig() {
+  if (typeof window !== 'undefined') {
+    if (localStorage.getItem('bioaccess_offline_mode') === 'true') {
+      return { url: '', anonKey: '', isConfigured: false, isOffline: true };
+    }
+  }
+
+  // Prioridad: Credenciales guardadas en el navegador por el usuario
+  const customUrl = typeof window !== 'undefined' ? localStorage.getItem('bioaccess_supabase_url') : null;
+  const customKey = typeof window !== 'undefined' ? localStorage.getItem('bioaccess_supabase_anon_key') : null;
+
   let url =
+    (customUrl && customUrl.trim()) ||
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
     process.env.VITE_SUPABASE_URL ||
     '';
 
   let anonKey =
+    (customKey && customKey.trim()) ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     process.env.VITE_SUPABASE_ANON_KEY ||
     '';
 
-  // Permitir credenciales guardadas en el navegador en Vercel
-  if (typeof window !== 'undefined') {
-    const customUrl = localStorage.getItem('bioaccess_supabase_url');
-    const customKey = localStorage.getItem('bioaccess_supabase_anon_key');
-    if (customUrl && (!url || url.includes('placeholder-project'))) url = customUrl;
-    if (customKey && (!anonKey || anonKey.includes('placeholder-anon-key'))) anonKey = customKey;
+  // Sanitización de URL: eliminar /rest/v1 o barras finales que rompen el cliente oficial de Supabase
+  if (url) {
+    url = url.trim().replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+  }
+  if (anonKey) {
+    anonKey = anonKey.trim();
   }
 
   const isConfigured = Boolean(
@@ -30,18 +42,35 @@ function resolveSupabaseConfig() {
     !anonKey.includes('placeholder-anon-key')
   );
 
-  return { url, anonKey, isConfigured };
+  return { url, anonKey, isConfigured, isOffline: false };
 }
 
 const config = resolveSupabaseConfig();
 export const supabaseUrl = config.url;
 export const supabaseAnonKey = config.anonKey;
 export const isSupabaseConfigured = config.isConfigured;
+export const isSupabaseOfflineMode = config.isOffline;
+
+export function enableOfflineMode() {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('bioaccess_offline_mode', 'true');
+    window.location.reload();
+  }
+}
+
+export function disableOfflineMode() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('bioaccess_offline_mode');
+    window.location.reload();
+  }
+}
 
 // Guardar credenciales de Supabase desde la UI para Vercel
 export function saveCustomSupabaseConfig(url: string, anonKey: string) {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('bioaccess_supabase_url', url.trim());
+    const cleanUrl = url.trim().replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+    localStorage.removeItem('bioaccess_offline_mode');
+    localStorage.setItem('bioaccess_supabase_url', cleanUrl);
     localStorage.setItem('bioaccess_supabase_anon_key', anonKey.trim());
     window.location.reload();
   }
@@ -51,7 +80,66 @@ export function clearCustomSupabaseConfig() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('bioaccess_supabase_url');
     localStorage.removeItem('bioaccess_supabase_anon_key');
+    localStorage.removeItem('bioaccess_offline_mode');
     window.location.reload();
+  }
+}
+
+// Testeo de conexión a Supabase en tiempo real
+export async function testSupabaseConnection(
+  testUrl?: string,
+  testKey?: string
+): Promise<{ success: boolean; message: string; statusCode?: number }> {
+  const targetUrl = (testUrl || supabaseUrl || '').trim().replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+  const targetKey = (testKey || supabaseAnonKey || '').trim();
+
+  if (!targetUrl || !targetKey || targetUrl.includes('placeholder-project')) {
+    return {
+      success: false,
+      message: 'Falta configurar la URL o la clave Anon de Supabase.',
+    };
+  }
+
+  try {
+    const res = await fetch(`${targetUrl}/rest/v1/turnos?select=id&limit=1`, {
+      method: 'GET',
+      headers: {
+        apikey: targetKey,
+        Authorization: `Bearer ${targetKey}`,
+      },
+    });
+
+    if (res.ok) {
+      return { success: true, message: '¡Conexión exitosa con la base de datos de Supabase!' };
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      return {
+        success: false,
+        statusCode: res.status,
+        message: 'Clave Anon / API Key inválida o no autorizada para este proyecto.',
+      };
+    }
+
+    if (res.status === 404) {
+      return {
+        success: true,
+        statusCode: res.status,
+        message: 'Conexión con Supabase alcanzada con éxito.',
+      };
+    }
+
+    return {
+      success: false,
+      statusCode: res.status,
+      message: `El servidor de Supabase respondió con código HTTP ${res.status}.`,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      message: `Error al contactar Supabase: ${msg}. Verifique que el proyecto no esté pausado y que la URL sea correcta.`,
+    };
   }
 }
 
@@ -326,17 +414,38 @@ export const TurnosService = {
 export const EmpleadosService = {
   async getAll(): Promise<Empleado[]> {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('empleados')
-        .select('*, turno:turnos(*)')
-        .order('nombre_completo');
+      try {
+        const { data, error } = await supabase
+          .from('empleados')
+          .select('*, turno:turnos(*)')
+          .order('nombre_completo');
 
-      if (error) {
-        console.error('[EmpleadosService.getAll] Error consultando Supabase:', error.message);
-        throw new Error(`Error al cargar lista de empleados desde Supabase: ${error.message}`);
+        if (!error && data) {
+          LocalStore.setEmpleados(data as Empleado[]);
+          return data as Empleado[];
+        }
+        if (error) {
+          console.warn('[EmpleadosService.getAll] Error consultando Supabase:', error.message);
+          throw new Error(`Error en Supabase: ${error.message}`);
+        }
+      } catch (err: unknown) {
+        console.warn('[EmpleadosService.getAll] Fallo de conexión o consulta con Supabase:', err);
+        // Fallback a almacenamiento local / servidor central
+        const local = LocalStore.getEmpleados();
+        if (local && local.length > 0) return local;
+
+        try {
+          const serverData = await syncServer();
+          if (serverData && Array.isArray(serverData.empleados) && serverData.empleados.length > 0) {
+            LocalStore.setEmpleados(serverData.empleados);
+            return serverData.empleados as Empleado[];
+          }
+        } catch {
+          // ignore
+        }
+
+        throw err;
       }
-
-      return (data || []) as Empleado[];
     }
 
     // Modo Servidor Central (Fallback si Supabase no está configurado)
@@ -353,71 +462,38 @@ export const EmpleadosService = {
     if (!cleanDoc) return null;
 
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('empleados')
-        .select('*, turno:turnos(*)')
-        .eq('documento', cleanDoc)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from('empleados')
+          .select('*, turno:turnos(*)')
+          .eq('documento', cleanDoc)
+          .maybeSingle();
 
-      if (error) {
-        console.error('[EmpleadosService.getByDocumento] Error Supabase:', error.message);
-        throw new Error(`Error al buscar empleado en Supabase: ${error.message}`);
+        if (!error && data) {
+          return data as Empleado;
+        }
+        if (error) {
+          console.warn('[EmpleadosService.getByDocumento] Error Supabase:', error.message);
+        }
+      } catch (err) {
+        console.warn('[EmpleadosService.getByDocumento] Fallo de conexión con Supabase:', err);
       }
-
-      return (data as Empleado) || null;
     }
 
-    const serverData = await syncServer();
-    if (serverData && Array.isArray(serverData.empleados)) {
-      const found = serverData.empleados.find((e: Empleado) => e.documento === cleanDoc);
-      if (found) return found;
+    try {
+      const serverData = await syncServer();
+      if (serverData && Array.isArray(serverData.empleados)) {
+        const found = serverData.empleados.find((e: Empleado) => e.documento === cleanDoc);
+        if (found) return found;
+      }
+    } catch {
+      // ignore
     }
 
     return LocalStore.getEmpleados().find(e => e.documento === cleanDoc) || null;
   },
 
   async create(emp: Omit<Empleado, 'id' | 'created_at'>): Promise<Empleado> {
-    if (isSupabaseConfigured) {
-      const estadoInicial = emp.estado || 'Pendiente_Biometria';
-
-      // Insertar directo en Supabase sin ID para que PostgreSQL genere gen_random_uuid()
-      const insertPayload: Record<string, any> = {
-        documento: emp.documento.trim(),
-        nombre_completo: emp.nombre_completo.trim(),
-        turno_id: emp.turno_id || null,
-        estado: estadoInicial,
-        estado_biometrico: 'pendiente de enrolamiento',
-        datos_biometricos: null,
-      };
-
-      let { data, error } = await supabase
-        .from('empleados')
-        .insert([insertPayload])
-        .select('*, turno:turnos(*)')
-        .single();
-
-      // Si la columna 'estado_biometrico' no existe en la BD del usuario, reintentar sin ella
-      if (error && (error.message.includes('estado_biometrico') || error.code === '42703')) {
-        delete insertPayload.estado_biometrico;
-        const retry = await supabase
-          .from('empleados')
-          .insert([insertPayload])
-          .select('*, turno:turnos(*)')
-          .single();
-        data = retry.data;
-        error = retry.error;
-      }
-
-      if (error) {
-        console.error('[EmpleadosService.create] Error en Supabase:', error.message);
-        throw new Error(`Error al registrar empleado en Supabase: ${error.message}`);
-      }
-
-      const created = data as Empleado;
-      LocalStore.saveEmpleado(created);
-      return created;
-    }
-
     const newEmp: Empleado = {
       ...emp,
       id: crypto.randomUUID(),
@@ -427,7 +503,51 @@ export const EmpleadosService = {
       created_at: new Date().toISOString()
     };
     LocalStore.saveEmpleado(newEmp);
-    await syncServer('saveEmpleado', newEmp);
+
+    if (isSupabaseConfigured) {
+      try {
+        const estadoInicial = emp.estado || 'Pendiente_Biometria';
+        const insertPayload: Record<string, any> = {
+          documento: emp.documento.trim(),
+          nombre_completo: emp.nombre_completo.trim(),
+          turno_id: emp.turno_id || null,
+          estado: estadoInicial,
+          estado_biometrico: 'pendiente de enrolamiento',
+          datos_biometricos: null,
+        };
+
+        let { data, error } = await supabase
+          .from('empleados')
+          .insert([insertPayload])
+          .select('*, turno:turnos(*)')
+          .single();
+
+        // Si la columna 'estado_biometrico' no existe en la BD del usuario, reintentar sin ella
+        if (error && (error.message.includes('estado_biometrico') || error.code === '42703')) {
+          delete insertPayload.estado_biometrico;
+          const retry = await supabase
+            .from('empleados')
+            .insert([insertPayload])
+            .select('*, turno:turnos(*)')
+            .single();
+          data = retry.data;
+          error = retry.error;
+        }
+
+        if (!error && data) {
+          const created = data as Empleado;
+          LocalStore.saveEmpleado(created);
+          return created;
+        }
+        if (error) {
+          console.warn('[EmpleadosService.create] Error en Supabase:', error.message);
+        }
+      } catch (err) {
+        console.warn('[EmpleadosService.create] Error de conexión con Supabase:', err);
+      }
+    }
+
+    await syncServer('saveEmpleado', newEmp).catch(() => {});
     return newEmp;
   },
 
