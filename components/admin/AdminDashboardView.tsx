@@ -26,15 +26,17 @@ import {
   Check,
   Loader2,
   Camera,
-  ScanFace
+  ScanFace,
+  BarChart3
 } from 'lucide-react';
+import { AdminStatsView } from './AdminStatsView';
 
 interface AdminDashboardViewProps {
   onBackToKiosk: () => void;
 }
 
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBackToKiosk }) => {
-  const [activeTab, setActiveTab] = useState<'asistencias' | 'empleados' | 'turnos'>('asistencias');
+  const [activeTab, setActiveTab] = useState<'asistencias' | 'estadisticas' | 'empleados' | 'turnos'>('asistencias');
   
   // Data States
   const [asistencias, setAsistencias] = useState<Asistencia[]>([]);
@@ -410,6 +412,19 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBackTo
 
             <button
               type="button"
+              onClick={() => setActiveTab('estadisticas')}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === 'estadisticas'
+                  ? 'bg-neon-green/15 text-neon-green border border-neon-green/30 shadow-[0_0_15px_rgba(34,197,94,0.15)]'
+                  : 'text-text-muted hover:text-text-main hover:bg-white/5'
+              }`}
+            >
+              <BarChart3 size={18} />
+              Estadísticas & Reportes
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab('empleados')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'empleados'
@@ -516,6 +531,15 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBackTo
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab('estadisticas')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${
+              activeTab === 'estadisticas' ? 'bg-neon-green text-black' : 'bg-surface text-text-muted'
+            }`}
+          >
+            Estadísticas
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('empleados')}
             className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${
               activeTab === 'empleados' ? 'bg-neon-green text-black' : 'bg-surface text-text-muted'
@@ -534,54 +558,56 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBackTo
           </button>
         </div>
 
-        {/* 4 TARJETAS DE ESTADÍSTICAS (KPIS) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* Presentes Hoy */}
-          <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-neon-green/15 border border-neon-green/30 flex items-center justify-center text-neon-green shadow-neon">
-              <Users size={24} />
+        {/* 4 TARJETAS DE ESTADÍSTICAS RÁPIDAS (KPIS) */}
+        {activeTab !== 'estadisticas' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {/* Presentes Hoy */}
+            <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-neon-green/15 border border-neon-green/30 flex items-center justify-center text-neon-green shadow-neon">
+                <Users size={24} />
+              </div>
+              <div>
+                <div className="text-xs text-text-dim font-medium">Presentes Hoy</div>
+                <div className="text-2xl font-extrabold text-white">{presentesHoy}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-text-dim font-medium">Presentes Hoy</div>
-              <div className="text-2xl font-extrabold text-white">{presentesHoy}</div>
-            </div>
-          </div>
 
-          {/* Tardanzas */}
-          <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-status-error/15 border border-status-error/30 flex items-center justify-center text-status-error">
-              <Flame size={24} />
+            {/* Tardanzas */}
+            <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-status-error/15 border border-status-error/30 flex items-center justify-center text-status-error">
+                <Flame size={24} />
+              </div>
+              <div>
+                <div className="text-xs text-text-dim font-medium">Tardanzas Detectadas</div>
+                <div className="text-2xl font-extrabold text-white">{tardanzasHoy}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-text-dim font-medium">Tardanzas Detectadas</div>
-              <div className="text-2xl font-extrabold text-white">{tardanzasHoy}</div>
-            </div>
-          </div>
 
-          {/* Excepciones Pendientes */}
-          <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-status-warning/15 border border-status-warning/30 flex items-center justify-center text-status-warning shadow-[0_0_15px_rgba(245,158,11,0.2)]">
-              <AlertTriangle size={24} />
+            {/* Excepciones Pendientes */}
+            <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-status-warning/15 border border-status-warning/30 flex items-center justify-center text-status-warning shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <div className="text-xs text-text-dim font-medium">Excepciones Pendientes</div>
+                <div className={`text-2xl font-extrabold ${excepcionesPendientes > 0 ? 'text-status-warning' : 'text-white'}`}>
+                  {excepcionesPendientes}
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-text-dim font-medium">Excepciones Pendientes</div>
-              <div className={`text-2xl font-extrabold ${excepcionesPendientes > 0 ? 'text-status-warning' : 'text-white'}`}>
-                {excepcionesPendientes}
+
+            {/* Horas Extras */}
+            <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-neon-emerald/15 border border-neon-emerald/30 flex items-center justify-center text-neon-emerald">
+                <Clock size={24} />
+              </div>
+              <div>
+                <div className="text-xs text-text-dim font-medium">Horas Extras Totales</div>
+                <div className="text-2xl font-extrabold text-white">{horasExtrasAcumuladas.toFixed(1)} hs</div>
               </div>
             </div>
           </div>
-
-          {/* Horas Extras */}
-          <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-neon-emerald/15 border border-neon-emerald/30 flex items-center justify-center text-neon-emerald">
-              <Clock size={24} />
-            </div>
-            <div>
-              <div className="text-xs text-text-dim font-medium">Horas Extras Totales</div>
-              <div className="text-2xl font-extrabold text-white">{horasExtrasAcumuladas.toFixed(1)} hs</div>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* TAB 1: MONITOR DE ASISTENCIAS */}
         {activeTab === 'asistencias' && (
@@ -713,7 +739,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onBackTo
           </div>
         )}
 
-        {/* TAB 2: GESTIÓN DE EMPLEADOS */}
+        {/* TAB 2: ESTADÍSTICAS & REPORTES */}
+        {activeTab === 'estadisticas' && (
+          <AdminStatsView
+            asistencias={asistencias}
+            empleados={empleados}
+            turnos={turnos}
+          />
+        )}
+
+        {/* TAB 3: GESTIÓN DE EMPLEADOS */}
         {activeTab === 'empleados' && (
           <div className="flex flex-col gap-5">
             <div className="flex items-center justify-between">

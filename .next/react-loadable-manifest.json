@@ -14,9 +14,9 @@
     ]
   },
   "components\\kiosk\\KioskScreen.tsx -> @/components/KioskScanner": {
-    "id": 9023,
+    "id": 7176,
     "files": [
-      "static/chunks/23.5ef2847705d152b9.js"
+      "static/chunks/176.593e5d9f5969cf10.js"
     ]
   },
   "components\\kiosk\\OnboardingModal.tsx -> @vladmandic/face-api": {
