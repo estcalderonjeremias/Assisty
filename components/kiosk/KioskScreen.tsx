@@ -370,7 +370,7 @@ export const KioskScreen: React.FC = () => {
             value={documento}
             onChange={setDocumento}
             onSubmit={handleFichar}
-            disabled={visualState === 'scanning'}
+            disabled={visualState !== 'idle'}
           />
         </div>
 

@@ -62,8 +62,12 @@ export const KioskScanner: React.FC<KioskScannerProps> = ({
         const faceapi = await import('@vladmandic/face-api');
         faceapiRef.current = faceapi;
 
-        await faceapi.tf.setBackend('webgl');
-        await faceapi.tf.ready();
+        if ('setBackend' in faceapi.tf) {
+          await (faceapi.tf as any).setBackend('webgl');
+        }
+        if ('ready' in faceapi.tf) {
+          await (faceapi.tf as any).ready();
+        }
 
         const MODEL_URL = '/models';
         await Promise.all([
